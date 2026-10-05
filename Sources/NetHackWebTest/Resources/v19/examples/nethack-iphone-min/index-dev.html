@@ -1,0 +1,318 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black">
+<meta name="apple-mobile-web-app-title" content="NetHack DEV">
+<title>NetHack 5.0 Safari Display Base V8</title>
+<style>
+:root {
+  --status-w: clamp(112px, 18vw, 170px);
+  --overlay-border: rgba(255,255,255,.20);
+}
+* { box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+html,body {
+  margin:0; width:100%; height:100%; background:#000; color:#eee;
+  overflow:hidden; overscroll-behavior:none;
+  font-family:Menlo,ui-monospace,monospace;
+}
+body { min-height:100vh; min-height:100dvh; }
+button {
+  font-family:inherit; color:rgba(255,255,255,.62); font-weight:500;
+  border:3px solid var(--overlay-border); border-radius:10px;
+  background:transparent; box-shadow:none;
+  text-shadow:0 1px 2px rgba(0,0,0,.80);
+  touch-action:none; -webkit-user-select:none; user-select:none;
+}
+button.pressed, button:active { background:rgba(105,125,155,.055); }
+#app { position:fixed; inset:0; background:#000; overflow:hidden; }
+#game { position:absolute; inset:0; background:#000; overflow:hidden; }
+#dungeon {
+  margin:0;
+  white-space:pre;
+  line-height:1;
+  font-family:Menlo,ui-monospace,monospace;
+
+  /* V11-06: keep ASCII dungeon internally for compatibility,
+     but use the NetHack tile Canvas as the visible dungeon. */
+  visibility:hidden;
+}
+
+/* ---------- Portrait = V13-01 UI ---------- */
+/* Dungeon upper / Status lower.
+   Messages + mode buttons + direction pad are overlays. */
+body[data-orientation="portrait"] #game {
+  display:grid;
+  grid-template-rows:minmax(0,1fr) auto;
+  padding:
+    env(safe-area-inset-top,0px)
+    env(safe-area-inset-right,0px)
+    env(safe-area-inset-bottom,0px)
+    env(safe-area-inset-left,0px);
+}
+
+body[data-orientation="portrait"] #messages {
+  position:absolute;
+  z-index:20;
+  left:calc(env(safe-area-inset-left,0px) + .45rem);
+  right:calc(env(safe-area-inset-right,0px) + .45rem);
+  top:calc(env(safe-area-inset-top,0px) + .40rem);
+  max-height:min(18vh,7.2em);
+  overflow-y:auto;
+  padding:.38em .58em;
+  border:1px solid rgba(255,255,255,.18);
+  border-radius:.55rem;
+  background:rgba(18,18,18,.32);
+  color:#eee;
+  font:clamp(11px,3.0vw,14px)/1.18 Menlo,ui-monospace,monospace;
+  white-space:pre-wrap;
+  scrollbar-width:thin;
+  pointer-events:auto;
+}
+
+body[data-orientation="portrait"] #dungeon-pane {
+  position:relative;
+  grid-row:1;
+  min-height:0;
+  overflow:hidden;
+  display:flex;
+  align-items:center;
+  justify-content:flex-start;
+}
+
+body[data-orientation="portrait"] #status-pane {
+  position:relative;
+  z-index:10;
+  grid-row:2;
+  min-height:5.0em;
+  overflow:hidden;
+  white-space:pre-wrap;
+  font:clamp(10px,2.65vw,13px)/1.16 Menlo,ui-monospace,monospace;
+  border-top:1px solid rgba(255,255,255,.16);
+  padding:.40rem .50rem calc(.40rem + env(safe-area-inset-bottom,0px));
+  background:rgba(0,0,0,.82);
+  color:#48ff63;
+}
+
+body[data-orientation="portrait"] #controls {
+  position:absolute;
+  z-index:50;
+  left:env(safe-area-inset-left,0px);
+  right:env(safe-area-inset-right,0px);
+  top:env(safe-area-inset-top,0px);
+  bottom:calc(env(safe-area-inset-bottom,0px) + 5.0em);
+  pointer-events:none;
+}
+
+body[data-orientation="portrait"] #mode-buttons {
+  position:absolute;
+  left:.28rem;
+  bottom:.28rem;
+  width:clamp(118px,34vw,158px);
+  height:min(31vh,260px);
+  display:grid;
+  grid-template-columns:1fr;
+  grid-template-rows:repeat(5,1fr);
+  gap:4px;
+  pointer-events:auto;
+}
+
+body[data-orientation="portrait"] .mode-btn {
+  min-width:0;
+  min-height:0;
+  padding:0;
+  font-size:clamp(16px,4.6vw,22px);
+}
+
+body[data-orientation="portrait"] #input-stage {
+  position:absolute;
+  right:.22rem;
+  bottom:.22rem;
+  width:min(54vw,250px);
+  height:min(31vh,260px);
+  pointer-events:auto;
+}
+
+body[data-orientation="portrait"] #action-panel {
+  position:fixed;
+  left:50%;
+  top:50%;
+  bottom:auto;
+  transform:translate(-50%,-50%);
+  width:min(82vw,360px);
+  max-height:70vh;
+  overflow-y:auto;
+  pointer-events:auto;
+}
+
+body[data-orientation="portrait"] #action-panel.visible {
+  display:flex;
+  flex-direction:column;
+  flex-wrap:nowrap;
+  gap:5px;
+  left:50%;
+  top:50%;
+  bottom:auto;
+  transform:translate(-50%,-50%);
+  width:min(82vw,360px);
+  max-width:none;
+  max-height:70vh;
+  padding:6px;
+}
+
+body[data-orientation="portrait"] #action-panel.visible .action-btn {
+  width:100%;
+  flex:0 0 auto;
+}
+
+/* ---------- Landscape = V13 philosophy ---------- */
+body[data-orientation="landscape"] #dungeon-pane {
+  position:absolute;
+  left:env(safe-area-inset-left,0px);
+  top:env(safe-area-inset-top,0px);
+  /* V11-08: Dungeon extends behind Status and controls
+     all the way to the right edge. */
+  right:env(safe-area-inset-right,0px);
+  bottom:env(safe-area-inset-bottom,0px);
+  overflow:hidden;
+  display:flex; align-items:center; justify-content:flex-start;
+}
+body[data-orientation="landscape"] #messages {
+  position:absolute; z-index:20;
+  left:calc(env(safe-area-inset-left,0px) + .55rem);
+  top:calc(env(safe-area-inset-top,0px) + .45rem);
+  width:min(54vw,54rem); max-height:min(24vh,7.2em);
+  overflow-y:auto; padding:.34em .58em;
+  border:1px solid rgba(255,255,255,.18); border-radius:.55rem;
+  background:rgba(18,18,18,.32); color:#eee;
+  font:clamp(11px,1.55vw,14px)/1.15 Menlo,ui-monospace,monospace;
+  white-space:pre-wrap; scrollbar-width:thin;
+}
+body[data-orientation="landscape"] #status-pane {
+  position:absolute; z-index:15;
+  top:env(safe-area-inset-top,0px);
+  right:env(safe-area-inset-right,0px);
+  bottom:env(safe-area-inset-bottom,0px);
+  width:var(--status-w); padding:.55rem;
+  border-left:1px solid rgba(255,255,255,.16);
+  background:rgba(0,0,0,.25); color:#48ff63;
+  overflow:hidden; white-space:pre;
+  font:clamp(10px,1.35vw,13px)/1.20 Menlo,ui-monospace,monospace;
+}
+body[data-orientation="landscape"] #controls {
+  position:absolute; z-index:50;
+  left:env(safe-area-inset-left,0px);
+  right:env(safe-area-inset-right,0px);
+  top:env(safe-area-inset-top,0px);
+  bottom:env(safe-area-inset-bottom,0px);
+  pointer-events:none;
+}
+body[data-orientation="landscape"] #mode-buttons {
+  position:absolute; left:.18rem; top:15%; bottom:21%;
+  width:clamp(168px,22.5vw,246px);
+  display:grid; grid-template-columns:1fr; grid-template-rows:repeat(5,1fr);
+  gap:3px; pointer-events:auto;
+}
+body[data-orientation="landscape"] .mode-btn {
+  min-width:0; min-height:0; padding:0; font-size:1.25em;
+}
+body[data-orientation="landscape"] #input-stage {
+  position:absolute; right:.10rem; top:50%; transform:translateY(-50%);
+  width:calc((var(--status-w) - .20rem) * 2);
+  max-width:42vw; height:min(58vh,500px); pointer-events:auto;
+}
+/* V19 build 2: mode buttons use the same low-visual-noise language as
+   the direction pad, while retaining labels needed to identify each mode. */
+.mode-btn {
+  border:none;
+  border-radius:10px;
+  background:rgba(255,255,255,.055);
+  color:rgba(255,255,255,.50);
+  text-shadow:none;
+}
+.mode-btn.pressed,
+.mode-btn:active {
+  background:rgba(255,255,255,.15);
+  color:rgba(255,255,255,.88);
+}
+
+#move-pad, #handwriting-surface { position:absolute; inset:0; }
+#move-pad {
+  display:grid; grid-template-columns:repeat(3,1fr); grid-template-rows:repeat(3,1fr); gap:5px;
+}
+/* V19 build 1: make the direction pad visually recede behind the Dungeon.
+   Keep the existing 3x3 hit areas and input behavior unchanged. */
+.move-btn {
+  min-width:0;
+  min-height:0;
+  font-size:1.5em;
+  border:none;
+  border-radius:10px;
+  background:rgba(255,255,255,.11);
+  color:transparent;
+  text-shadow:none;
+}
+.move-btn.pressed,
+.move-btn:active {
+  background:rgba(255,255,255,.18);
+}
+#handwriting-surface {
+  display:none; border:3px solid rgba(255,255,255,.24);
+  border-radius:14px; background:transparent; overflow:hidden;
+}
+#input-stage.handwriting #move-pad { display:none; }
+#input-stage.handwriting #handwriting-surface { display:block; }
+#handwriting-label {
+  position:absolute; z-index:2; left:8px; top:6px;
+  color:rgba(255,255,255,.72); font-size:11px; pointer-events:none;
+}
+#stroke { display:block; width:100%; height:100%; background:transparent; touch-action:none; }
+
+/* V7 compatibility actions for menus / y-n / continue. */
+#action-panel { display:none; }
+#action-panel.visible {
+  display:flex; flex-wrap:wrap; gap:4px;
+  position:absolute; z-index:80; pointer-events:auto;
+  left:50%; transform:translateX(-50%);
+  bottom:calc(env(safe-area-inset-bottom,0px) + .3rem);
+  max-width:52vw; max-height:42vh; overflow-y:auto;
+  padding:4px; border-radius:10px; background:rgba(0,0,0,.56);
+}
+.action-btn { min-height:42px; padding:6px 12px; font-size:15px; }
+
+#screen { white-space:pre-wrap; font-size:12px; line-height:1.05; }
+
+/* V13 iPad portrait controls:
+   Keep iPhone portrait and all landscape layouts unchanged. */
+@media (orientation: portrait) and (min-width: 700px) {
+  body[data-orientation="portrait"] #mode-buttons {
+    width: 210px;
+    height: 340px;
+  }
+
+  body[data-orientation="portrait"] .mode-btn {
+    font-size: 28px;
+  }
+
+  body[data-orientation="portrait"] #input-stage {
+    width: 340px;
+    height: 340px;
+  }
+}
+
+</style>
+</head>
+<body>
+<pre id="screen">Loading NetHack 5.0...</pre>
+<script src="./ai/tf.min.js"></script>
+<script src="../../param/tileMapping.js"></script>
+<script type="module" src="main.js?dev=1308"></script>
+<script>
+// DEV page: do not register the NetHack Service Worker.
+// V11 development is served directly from the Python HTTP server.
+console.log('[NetHack DEV] Service Worker registration skipped');
+</script>
+</body>
+</html>
