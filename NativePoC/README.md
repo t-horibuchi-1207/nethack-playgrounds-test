@@ -33,3 +33,18 @@ WKURLSchemeHandler で HTTPURLResponse(url:statusCode:200:httpVersion:headerFiel
 - 長期間・複数ゲームにわたる保存の堅牢性
 - App Store配布、署名、ライセンス
 - Playgroundsで参照コードに差し替えた状態の再検証
+
+## GitHub保存版の再現性検証（2026-10-12）
+
+ユーザーがSwift Playgroundsで既存アプリを複製し、GitHubの `NativePoC/ContentView.swift` を全文貼り付けて実機で再検証。次のすべてについて成功を報告した。
+
+- NetHack WASM起動
+- TensorFlow.js手書き文字認識
+- ASCII縦画面・横画面
+- TILE縦画面・横画面
+- セーブと再開
+- アプリ完全終了・再起動後のセーブ保持と再開
+
+結論: GitHubに保存したSwift参照コードは、既存アプリとは別のPlaygrounds複製環境でも再現動作した。
+
+注意: この記録は実機でのユーザー報告に基づく。iPhoneでの実行、App Store配布は未検証。
