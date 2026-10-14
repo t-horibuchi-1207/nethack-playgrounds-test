@@ -10,7 +10,7 @@ let package = Package(
     targets: [
         .target(
             name: "NetHackWebTest",
-            resources: [.copy("Resources")]
+            resources: [.process("Resources")]
         )
     ]
 )
