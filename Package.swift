@@ -10,7 +10,15 @@ let package = Package(
     targets: [
         .target(
             name: "NetHackWebTest",
-            resources: [.process("Resources")]
+            resources: [
+                .copy("Resources/v19"),
+                .process("Resources/helper.js"),
+                .process("Resources/test.html"),
+                .process("Resources/test.js"),
+                .process("Resources/test.wasm"),
+                .process("Resources/worker.js"),
+                .copy("Resources/sub")
+            ]
         )
     ]
 )
